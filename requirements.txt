@@ -1,0 +1,16 @@
+google-auth
+google-auth-oauthlib
+google-api-python-client
+sentence-transformers
+torch
+transformers
+scikit-learn
+numpy
+pandas
+opencv-python
+Pillow
+isodate
+apscheduler
+requests
+tqdm
+ffmpeg-python

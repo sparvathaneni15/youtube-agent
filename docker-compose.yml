@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+  llm:
+    image: ghcr.io/huggingface/text-generation-inference:1.4
+    ports:
+      - "8000:8000"
+    environment:
+      - MAX_CONCURRENCY=2
+    command: ["--model-id", "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"]
+
+  youtube_agent:
+    build: ./docker
+    depends_on:
+      - llm
+    environment:
+      - LLM_ENDPOINT=http://llm:8000/v1/chat/completions
+    volumes:
+      - ./config:/app/config
+      - ./models:/app/models
+    command: ["schedule"]
+    restart: unless-stopped
