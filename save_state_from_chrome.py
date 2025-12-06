@@ -7,7 +7,7 @@ and saves Playwright storage state to storage_state.json.
 """
 
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright # type: ignore
 
 # Path to your *actual* Chrome profile
 CHROME_PROFILE = (
