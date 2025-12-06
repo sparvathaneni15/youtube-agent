@@ -5,25 +5,15 @@ import re, json, time
 STATE_FILE = "storage_state.json"
 YOUTUBE_URL = "https://www.youtube.com/"
 
-def parse_video_id(url):
-    match = re.search(r"v=([A-Za-z0-9_\-]+)", url)
-    return match.group(1) if match else None
-
 
 def find_video_cards(page):
     """
     YouTube uses multiple DOM layouts.
     We merge all possible video containers into one locator.
     """
-    selectors = [
-        "ytd-rich-item-renderer",
-        "ytd-rich-grid-media",
-        "ytd-grid-video-renderer",
-        "ytd-video-renderer"
-    ]
+    selector = "ytd-rich-item-renderer"
 
-    combined = ",".join(selectors)
-    return page.locator(combined)
+    return page.locator(selector)
 
 
 
@@ -39,16 +29,15 @@ def scrape_video(item):
 
     def safe_attr(locator, attr):
         try:
-            return item.locator(locator).get_attribute(attr, timeout=500)
+            target = item.locator(locator)
+            value = target.get_attribute(attr, timeout=500)
+            print(value)
+            return value
         except:
             return None
 
     # ---------- TITLE ----------
-    title = (
-        safe_text("h3 a") or
-        safe_text("a#video-title") or
-        safe_text("a[title]")
-    )
+    title = safe_text("h3 a")    
 
     # ---------- URL ----------
     url = safe_attr("h3 a", "href")
@@ -56,18 +45,14 @@ def scrape_video(item):
         url = "https://www.youtube.com" + url
 
     # ---------- THUMBNAIL ----------
-    thumbnail = (
-        safe_attr("img.ytCoreImageHost cover video-thumbnail-img ytCoreImageFillParentHeight ytCoreImageFillParentWidth", "src")
-        or safe_attr("img", "src")
-    )
+    thumbnail = safe_attr("yt-thumbnail-view-model img", "src")
 
     # ---------- CHANNEL, VIEWS, TIME AGO ----------
-    channel = safe_text("ytm-badge-and-byline-renderer", "span")
+    channel = safe_text("yt-content-metadata-view-model a")
 
     return {
         "title": title,
         "url": url,
-        "video_id": parse_video_id(url) if url else None,
         "thumbnail": thumbnail,
         "channel": channel
     }
@@ -83,15 +68,13 @@ def main():
         print("Loading YouTube…")
         page.goto(YOUTUBE_URL, wait_until="networkidle")
 
-        # YouTube lazy loads; scroll to load more
-
 
         cards = find_video_cards(page)
         count = cards.count()
         print(f"Found {count} video cards")
 
         results = []
-        for i in range(count):
+        for i in range(1):
             card = scrape_video(cards.nth(i))
             print(f"finised checking {i}th video")
             if card:
