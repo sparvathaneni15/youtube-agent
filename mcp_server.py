@@ -1,8 +1,7 @@
-from mcp.server import Server
-from mcp import types
+from mcp.server import Server # type: ignore
+from mcp import types # type: ignore
 import json
-from scrape_youtube import scrape_youtube
-from youtube_actions import save_video
+from youtube_actions import scrape_youtube, save_video
 
 server = Server("youtube-agent")
 

@@ -10,66 +10,63 @@ load_dotenv()
 STATE_FILE = os.path.abspath(os.getenv('STATE_FILE'))
 YOUTUBE_URL = "https://www.youtube.com/"
 
-def find_video_cards(page):
-    """
-    YouTube uses multiple DOM layouts.
-    We merge all possible video containers into one locator.
-    """
-    selector = "ytd-rich-item-renderer"
-
-    return page.locator(selector)
-
-
-
-def scrape_video(item):
-    def safe_text(locator, nth=None):
-        try:
-            target = item.locator(locator)
-            if nth is not None:
-                target = target.nth(nth)
-            return target.inner_text(timeout=500).strip()
-        except:
-            return None
-
-    def safe_attr(locator, attr):
-        try:
-            target = item.locator(locator)
-            value = target.get_attribute(attr, timeout=500)
-            return value
-        except:
-            return None
-
-    # ---------- TITLE ----------
-    title = safe_text("h3 a")    
-
-    # ---------- URL ----------
-    url = safe_attr("h3 a", "href")
-
-    # Normalize
-    if url and url.startswith("/"):
-        url = "https://www.youtube.com" + url
-
-    # --- Skip YouTube Shorts ---
-    if url and "/shorts/" in url:
-        return None    # skip this card entirely
-
-
-    # ---------- THUMBNAIL ----------
-    thumbnail = safe_attr("yt-thumbnail-view-model img", "src")
-
-    # ---------- CHANNEL, VIEWS, TIME AGO ----------
-    channel = safe_text("yt-content-metadata-view-model a")
-
-    return {
-        "title": title,
-        "url": url,
-        "thumbnail": thumbnail,
-        "channel": channel
-    }
-
-
-
 def scrape_youtube():
+    def find_video_cards(page):
+        """
+        YouTube uses multiple DOM layouts.
+        We merge all possible video containers into one locator.
+        """
+        selector = "ytd-rich-item-renderer"
+
+        return page.locator(selector)
+    
+    def scrape_video(item):
+        def safe_text(locator, nth=None):
+            try:
+                target = item.locator(locator)
+                if nth is not None:
+                    target = target.nth(nth)
+                return target.inner_text(timeout=500).strip()
+            except:
+                return None
+
+        def safe_attr(locator, attr):
+            try:
+                target = item.locator(locator)
+                value = target.get_attribute(attr, timeout=500)
+                return value
+            except:
+                return None
+
+        # ---------- TITLE ----------
+        title = safe_text("h3 a")    
+
+        # ---------- URL ----------
+        url = safe_attr("h3 a", "href")
+
+        # Normalize
+        if url and url.startswith("/"):
+            url = "https://www.youtube.com" + url
+
+        # --- Skip YouTube Shorts ---
+        if url and "/shorts/" in url:
+            return None    # skip this card entirely
+
+
+        # ---------- THUMBNAIL ----------
+        thumbnail = safe_attr("yt-thumbnail-view-model img", "src")
+
+        # ---------- CHANNEL, VIEWS, TIME AGO ----------
+        channel = safe_text("yt-content-metadata-view-model a")
+
+        return {
+            "title": title,
+            "url": url,
+            "thumbnail": thumbnail,
+            "channel": channel
+        }
+    
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         context = browser.new_context(storage_state=STATE_FILE)
