@@ -13,10 +13,8 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # App code
 COPY agent_runner.py /app/agent_runner.py
-COPY start.sh /app/start.sh
+COPY mcp_server.py /app/mcp_server.py
 
-# Ensure script is executable
-RUN chmod +x /app/start.sh
 
 # Use explicit interpreter to avoid shebang issues
-ENTRYPOINT ["sh", "/app/start.sh"]
+ENTRYPOINT ["python", "/app/agent_runner.py"]

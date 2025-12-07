@@ -4,3 +4,4 @@ storage_state.json
 system_instructions.md
 .github/
 data/
+__pycache__/

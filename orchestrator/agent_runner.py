@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 import os, sys, json, time
-import requests
+import requests # type: ignore
 from pathlib import Path
+from mcp.server import Server # type: ignore
+
+from dotenv import load_dotenv # type: ignore
+
+load_dotenv()
+
+# Ensure repo root is on sys.path so we can import mcp_server when running locally
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
@@ -9,6 +19,7 @@ SYSTEM_PATH = Path(os.getenv("SYSTEM_PATH", "../system_instructions.md"))
 INPUT_PATH = Path(os.getenv("INPUT_PATH", "../data/scraped.json"))
 OUTPUT_PATH = Path(os.getenv("OUTPUT_PATH", "../data/selected.json"))
 DRY_RUN = os.getenv("DRY_RUN", "true").lower() == "true"
+USE_MCP_MODULE = os.getenv("USE_MCP_MODULE", "false").lower() == "true"
 
 SESSION = requests.Session()
 
@@ -27,6 +38,41 @@ def read_json(path: Path):
     except Exception as e:
         print(f"[orchestrator] Failed to read JSON {path}: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def scrape_via_mcp_module():
+    """
+    Calls the tool wrapper defined in mcp_server.py directly as a function.
+    This does NOT speak the MCP protocol; it imports and invokes the wrapper.
+    Returns the parsed Python list of video dicts.
+    """
+    try:
+        from orchestrator.mcp_server import scrape_youtube_tool  # type: ignore
+    except Exception as e:
+        print(f"[orchestrator] Could not import mcp_server.scrape_youtube_tool: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    content = scrape_youtube_tool()
+
+    # mcp.types.TextContent likely exposes the JSON via a 'text' attribute
+    text = None
+    if hasattr(content, "title"):
+        title = getattr(content, "title")
+    elif hasattr(content, "url"):
+        url = getattr(content, "url")
+    elif isinstance(content, str):
+        text = content
+    else:
+        # Last resort: try to stringify
+        text = str(content)
+
+    try:
+        data = json.loads(text)
+    except Exception as e:
+        print(f"[orchestrator] Failed to parse JSON from mcp_server tool output: {e}\nRaw: {text}", file=sys.stderr)
+        sys.exit(2)
+
+    return data
 
 
 def chat_ollama(messages, model: str, format_schema=None):
@@ -77,7 +123,13 @@ def chat_ollama(messages, model: str, format_schema=None):
 
 def main():
     system_text = read_text(SYSTEM_PATH)
-    scraped = read_json(INPUT_PATH)
+    print(USE_MCP_MODULE)
+    if USE_MCP_MODULE:
+        scraped = scrape_via_mcp_module()
+        print(f"[orchestrator] Scraped {len(scraped)} videos via MCP module.")
+    else:
+        scraped = read_json(INPUT_PATH)
+        print("scraped from file")
 
     # Expect a list of dicts with keys: title, url, thumbnail, channel
     videos = scraped if isinstance(scraped, list) else scraped.get("videos", [])
