@@ -1,2 +1,6 @@
-storage_state.json
+youtube-agent/
 .env
+storage_state.json
+system_instructions.md
+.github/
+data/

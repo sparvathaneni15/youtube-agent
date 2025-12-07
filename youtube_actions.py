@@ -10,7 +10,7 @@ load_dotenv()
 STATE_FILE = os.path.abspath(os.getenv('STATE_FILE'))
 YOUTUBE_URL = "https://www.youtube.com/"
 
-def scrape_youtube():
+def scrape_youtube(output_path: str | None = "data/scraped.json"):
     def find_video_cards(page):
         """
         YouTube uses multiple DOM layouts.
@@ -68,18 +68,15 @@ def scrape_youtube():
     
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context(storage_state=STATE_FILE)
         page = context.new_page()
 
-        print("Loading YouTube…")
-        print(STATE_FILE)
         page.goto(YOUTUBE_URL)
 
 
         cards = find_video_cards(page)
         count = cards.count()
-        print(f"Found {count} video cards")
 
         results = []
         for i in range(count):
@@ -102,14 +99,26 @@ def scrape_youtube():
                 # --- Scrape the card after guaranteed loading ---
                 card = scrape_video(item)
 
-                print(f"finished checking {i}th video")
-
                 if card:
                     results.append(card)
 
             except Exception as e:
                 print(f"[WARN] error scraping card {i}: {e}")
 
+        # Write results to file if requested
+        if output_path:
+            out_abs = os.path.abspath(output_path)
+            os.makedirs(os.path.dirname(out_abs), exist_ok=True)
+            with open(out_abs, "w", encoding="utf-8") as f:
+                json.dump(results, f, indent=2)
+            print(f"[scrape_youtube] Wrote {len(results)} items to {out_abs}")
+
+        # Also print JSON to stdout for convenience
         print(json.dumps(results, indent=2))
 
         browser.close()
+
+    return results
+
+if __name__ == "__main__":
+    scrape_youtube()

@@ -1,0 +1,32 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    container_name: youtube-agent-orchestrator
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:3b
+      - SYSTEM_PATH=/app/system_instructions.md
+      - INPUT_PATH=/data/scraped.json
+      - OUTPUT_PATH=/data/selected.json
+      - DRY_RUN=true
+    depends_on:
+      - ollama
+    volumes:
+      - ./system_instructions.md:/app/system_instructions.md:ro
+      - ./data:/data
+      - ./logs:/logs
+
+volumes:
+  ollama-data:
+    driver: local
