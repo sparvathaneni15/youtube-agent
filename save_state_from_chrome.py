@@ -7,9 +7,9 @@ and saves Playwright storage state to storage_state.json.
 """
 
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright # type: ignore
 import re, json, time, os
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 
 load_dotenv()
 
