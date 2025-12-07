@@ -7,12 +7,15 @@ and saves Playwright storage state to storage_state.json.
 """
 
 from pathlib import Path
-from playwright.sync_api import sync_playwright # type: ignore
+from playwright.sync_api import sync_playwright
+import re, json, time, os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # Path to your *actual* Chrome profile
-CHROME_PROFILE = (
-    "/Users/samanyuparvathaneni/Library/Application Support/Google/Chrome/Default/Default"
-)
+CHROME_PROFILE = os.path.abspath(os.getenv('PROFILE'))
 
 # Output where Playwright will save cookies + localStorage/sessionStorage
 STATE_FILE = Path("storage_state.json")
