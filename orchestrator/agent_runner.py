@@ -122,14 +122,26 @@ def chat_ollama(messages, model: str, format_schema=None):
 
 
 def main():
+    from datetime import datetime
+    
+    # Import YouTube actions and notifier from parent directory
+    try:
+        from youtube_actions import add_to_watch_later
+        from notifier import send_telegram_notification
+    except ImportError as e:
+        print(f"[orchestrator] ERROR: Could not import modules: {e}", file=sys.stderr)
+        print(f"[orchestrator] Make sure youtube_actions.py and notifier.py are in parent directory", file=sys.stderr)
+        sys.exit(1)
+    
     system_text = read_text(SYSTEM_PATH)
-    print(USE_MCP_MODULE)
+    print(f"[orchestrator] USE_MCP_MODULE={USE_MCP_MODULE}, DRY_RUN={DRY_RUN}")
+    
     if USE_MCP_MODULE:
         scraped = scrape_via_mcp_module()
         print(f"[orchestrator] Scraped {len(scraped)} videos via MCP module.")
     else:
         scraped = read_json(INPUT_PATH)
-        print("scraped from file")
+        print(f"[orchestrator] Loaded {len(scraped) if isinstance(scraped, list) else 'unknown'} videos from file")
 
     # Expect a list of dicts with keys: title, url, thumbnail, channel
     videos = scraped if isinstance(scraped, list) else scraped.get("videos", [])
@@ -179,12 +191,70 @@ def main():
     OUTPUT_PATH.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result, indent=2))
 
-    # Optionally call actions here (future: MCP tool add_to_watch_later)
+    # Execute Watch Later actions
+    selections = result.get("selections", [])
+    
     if DRY_RUN:
-        print("[orchestrator] DRY_RUN=true, not invoking add_to_watch_later.")
+        print(f"[orchestrator] DRY_RUN=true, would add {len(selections)} videos to Watch Later")
+        for sel in selections:
+            print(f"  - {sel.get('url')}")
+        return
+    
+    # Execute actions for real
+    print(f"[orchestrator] Adding {len(selections)} videos to Watch Later...")
+    
+    videos_added = []
+    videos_failed = []
+    
+    for selection in selections:
+        url = selection.get("url")
+        reason = selection.get("reason")
+        
+        # Find the original video metadata
+        video_meta = None
+        for v in videos:
+            if v.get("url") == url:
+                video_meta = v
+                break
+        
+        if not video_meta:
+            print(f"[orchestrator] WARNING: Could not find metadata for {url}")
+            video_meta = {"title": "Unknown", "channel": "Unknown", "url": url}
+        
+        # Add to Watch Later
+        action_result = add_to_watch_later(url)
+        
+        if action_result.get("success"):
+            videos_added.append({
+                "title": video_meta.get("title"),
+                "url": url,
+                "channel": video_meta.get("channel"),
+                "reason": reason
+            })
+        else:
+            videos_failed.append({
+                "title": video_meta.get("title"),
+                "url": url,
+                "message": action_result.get("message")
+            })
+    
+    # Send notification
+    run_time = datetime.now().strftime("%I:%M %p")
+    print(f"[orchestrator] Sending Telegram notification...")
+    
+    notification_sent = send_telegram_notification(
+        videos_added=videos_added,
+        videos_failed=videos_failed if videos_failed else None,
+        run_time=run_time
+    )
+    
+    if notification_sent:
+        print(f"[orchestrator] ✅ Workflow complete: {len(videos_added)} added, {len(videos_failed)} failed")
     else:
-        # Placeholder: implement MCP client call to add_to_watch_later(video_id)
-        print("[orchestrator] Action execution not implemented yet.")
+        print(f"[orchestrator] ⚠️ Workflow complete but notification failed")
+    
+    # Exit with appropriate code
+    sys.exit(0 if len(videos_failed) == 0 else 1)
 
 
 if __name__ == "__main__":

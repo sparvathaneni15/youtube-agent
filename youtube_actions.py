@@ -120,5 +120,106 @@ def scrape_youtube(output_path: str | None = "data/scraped.json"):
 
     return results
 
+def add_to_watch_later(video_url: str, timeout: int = 10000) -> dict:
+    """
+    Add a YouTube video to the Watch Later playlist.
+    
+    Args:
+        video_url: Full YouTube video URL (e.g., https://youtube.com/watch?v=...)
+        timeout: Maximum time to wait for elements (milliseconds)
+    
+    Returns:
+        dict with keys:
+            - success: bool
+            - url: str (original URL)
+            - message: str (error message if failed)
+    """
+    result = {
+        "success": False,
+        "url": video_url,
+        "message": ""
+    }
+    
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(storage_state=STATE_FILE)
+            page = context.new_page()
+            
+            print(f"[add_to_watch_later] Navigating to {video_url}")
+            page.goto(video_url, wait_until="domcontentloaded", timeout=timeout)
+            
+            # Wait for page to be ready
+            page.wait_for_load_state("networkidle", timeout=timeout)
+            
+            # YouTube has multiple possible button selectors, try them in order
+            save_button_selectors = [
+                "button[aria-label*='Save']",
+                "button[aria-label*='save']",
+                "ytd-button-renderer:has-text('Save')",
+                "#button-shape-like + button",  # Often next to like button
+            ]
+            
+            save_button = None
+            for selector in save_button_selectors:
+                try:
+                    save_button = page.locator(selector).first
+                    if save_button.is_visible(timeout=2000):
+                        print(f"[add_to_watch_later] Found Save button with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            if not save_button:
+                result["message"] = "Could not find Save button"
+                print(f"[add_to_watch_later] ERROR: {result['message']}")
+                browser.close()
+                return result
+            
+            # Click the Save button
+            save_button.click(timeout=timeout)
+            page.wait_for_timeout(1000)  # Wait for menu to appear
+            
+            # Find and click "Watch later" option in the menu
+            watch_later_selectors = [
+                "text='Watch later'",
+                "text='Watch Later'",
+                "ytd-playlist-add-to-option-renderer:has-text('Watch later')",
+                "[aria-label*='Watch later']",
+            ]
+            
+            watch_later_option = None
+            for selector in watch_later_selectors:
+                try:
+                    watch_later_option = page.locator(selector).first
+                    if watch_later_option.is_visible(timeout=2000):
+                        print(f"[add_to_watch_later] Found Watch Later option with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            if not watch_later_option:
+                result["message"] = "Could not find Watch Later option in menu"
+                print(f"[add_to_watch_later] ERROR: {result['message']}")
+                browser.close()
+                return result
+            
+            # Click Watch Later
+            watch_later_option.click(timeout=timeout)
+            page.wait_for_timeout(1000)  # Wait for action to complete
+            
+            # Success!
+            result["success"] = True
+            result["message"] = "Successfully added to Watch Later"
+            print(f"[add_to_watch_later] ✅ {result['message']}")
+            
+            browser.close()
+            
+    except Exception as e:
+        result["message"] = f"Error: {str(e)}"
+        print(f"[add_to_watch_later] ERROR: {result['message']}")
+    
+    return result
+
 if __name__ == "__main__":
     scrape_youtube()

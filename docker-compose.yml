@@ -7,6 +7,12 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   orchestrator:
     build:
@@ -19,11 +25,16 @@ services:
       - SYSTEM_PATH=/app/system_instructions.md
       - INPUT_PATH=/data/scraped.json
       - OUTPUT_PATH=/data/selected.json
-      - DRY_RUN=true
-    depends_on:
-      - ollama
+      - DRY_RUN=${DRY_RUN:-false}
+      - USE_MCP_MODULE=false
+      - STATE_FILE=/app/storage_state.json
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - ./system_instructions.md:/app/system_instructions.md:ro
+      - ./storage_state.json:/app/storage_state.json:ro
+      - ./youtube_actions.py:/app/youtube_actions.py:ro
+      - ./notifier.py:/app/notifier.py:ro
       - ./data:/data
       - ./logs:/logs
 
